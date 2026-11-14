@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 
 mod device;
 mod ipa;
+mod lockdown;
 
 #[tokio::main()]
 async fn main() -> Result<()> {

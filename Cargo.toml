@@ -8,5 +8,6 @@ description = "Open-source IPA sideloader for iPhone, written in Rust"
 [dependencies]
 anyhow = "1.0.104"
 plist = "1.10.3"
+serde = { version = "1.0.229", features = ["derive"] }
 tokio = { version = "1.54.1", features = ["full"] }
 zip = "9.5.1"
