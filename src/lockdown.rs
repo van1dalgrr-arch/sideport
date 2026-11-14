@@ -33,7 +33,7 @@ impl Lockdown {
 
     pub async fn get_values(&mut self) -> Result<()> {
         let mut request = plist::Dictionary::new();
-        request.insert("Label".into(), "ipaload".into());
+        request.insert("Label".into(), "sideport".into());
         request.insert("Request".into(), "GetValue".into());
 
         self.send(&request).await?;

@@ -89,8 +89,8 @@ impl Usbmux {
 fn new_request(message_type: &str) -> plist::Dictionary {
     let mut request = plist::Dictionary::new();
     request.insert("MessageType".into(), message_type.into());
-    request.insert("ClientVersionString".into(), "ipaload".into());
-    request.insert("ProgName".into(), "ipaload".into());
+    request.insert("ClientVersionString".into(), "sideport".into());
+    request.insert("ProgName".into(), "sideport".into());
     request
 }
 
