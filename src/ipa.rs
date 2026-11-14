@@ -1,5 +1,4 @@
 use anyhow::{Context, Result};
-use std::env;
 use std::fs::File;
 use std::io::Read;
 use zip::ZipArchive;
@@ -20,9 +19,19 @@ pub fn read_info(path: &str) -> Result<()> {
 
     let mut entry = archive.by_name(&plist_path)?;
     let mut buf = Vec::new();
-    entry.read_to_end(&mut buf);
+    entry.read_to_end(&mut buf)?;
 
-    println!("{plist_path}, {} bytes", buf.len());
+    let value: plist::Value = plist::from_bytes(&buf)?;
+    let dict = value
+        .as_dictionary()
+        .context("Info.plist is not a dictionary")?;
+
+    let bundle_id = dict
+        .get("CFBundleIdentifier")
+        .and_then(|v| v.as_string())
+        .context("no CFBundleIdentifier")?;
+
+    println!("bundle id: {bundle_id}");
 
     Ok(())
 }

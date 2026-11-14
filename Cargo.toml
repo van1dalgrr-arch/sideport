@@ -2,8 +2,11 @@
 name = "ipaload"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+description = "Open-source IPA sideloader for iPhone, written in Rust"
 
 [dependencies]
 anyhow = "1.0.104"
 plist = "1.10.3"
+tokio = { version = "1.54.1", features = ["full"] }
 zip = "9.5.1"

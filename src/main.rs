@@ -2,14 +2,21 @@ use std::env;
 
 use anyhow::{Context, Result};
 
+mod device;
 mod ipa;
 
-fn main() -> Result<()> {
-    let path = env::args()
-        .nth(1)
-        .context("usege: upload .ipa file to resign")?;
+#[tokio::main()]
+async fn main() -> Result<()> {
+    let mut args = env::args().skip(1);
+    let cmd =args.next().context("usage: ipaload <info|devices>")?;
 
-    ipa::read_info(&path)?;
-
+    match cmd.as_str() {
+        "info" => {
+            let path = args.next().context("usage: ipaload info <file.ipa>")?;
+            ipa::read_info(&path)?;
+        }
+        "devices" => device::list().await?,
+        _ => anyhow::bail!("unknown command: {cmd}"),
+    }
     Ok(())
 }
