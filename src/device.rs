@@ -1,4 +1,4 @@
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use serde::Deserialize;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::UnixStream;
@@ -32,6 +32,23 @@ struct Properties {
 #[serde(rename_all = "PascalCase")]
 struct ResultResponse {
     number: u32,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct PairRecordResponse {
+    pair_record_data: plist::Data,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct PairRecord {
+    #[serde(rename = "HostID")]
+    pub host_id: String,
+    #[serde(rename = "SystemBUID")]
+    pub system_buid: String,
+    pub host_certificate: plist::Data,
+    pub host_private_key: plist::Data,
 }
 
 struct Usbmux {
@@ -84,6 +101,20 @@ impl Usbmux {
 
         Ok(self.stream)
     }
+
+    async fn read_pair_record(&mut self, udid: &str) -> Result<PairRecord> {
+        let mut request = new_request("ReadPairRecord");
+        request.insert("PairRecordID".into(), udid.into());
+
+        self.send(&request).await?;
+        let payload = self.recv().await?;
+
+        let response: PairRecordResponse =
+            plist::from_bytes(&payload).context("device is not paired with this Mac")?;
+        let record: PairRecord = plist::from_bytes(response.pair_record_data.as_ref())?;
+
+        Ok(record)
+    }
 }
 
 fn new_request(message_type: &str) -> plist::Dictionary {
@@ -123,6 +154,12 @@ pub async fn list() -> Result<()> {
             "  {}, {}, iOS {}",
             info.device_name, info.product_type, info.product_version
         );
+
+        let mut pairing = Usbmux::connect().await?;
+        let record = pairing
+            .read_pair_record(&d.properties.serial_number)
+            .await?;
+        println!("  paired, host id {}", record.host_id);
     }
 
     Ok(())
