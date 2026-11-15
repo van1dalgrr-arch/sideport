@@ -118,7 +118,11 @@ pub async fn list() -> Result<()> {
         let stream = conn.connect_port(d.device_id, LOCKDOWN_PORT).await?;
 
         let mut lockdown = Lockdown::new(stream);
-        lockdown.get_values().await?;
+        let info = lockdown.get_values().await?;
+        println!(
+            "  {}, {}, iOS {}",
+            info.device_name, info.product_type, info.product_version
+        );
     }
 
     Ok(())

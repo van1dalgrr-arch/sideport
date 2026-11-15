@@ -1,6 +1,21 @@
 use anyhow::Result;
+use serde::Deserialize;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::UnixStream;
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct DeviceInfo {
+    pub device_name: String,
+    pub product_type: String,
+    pub product_version: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct GetValueResponse {
+    value: DeviceInfo,
+}
 
 pub struct Lockdown {
     stream: UnixStream,
@@ -31,7 +46,7 @@ impl Lockdown {
         Ok(payload)
     }
 
-    pub async fn get_values(&mut self) -> Result<()> {
+    pub async fn get_values(&mut self) -> Result<DeviceInfo> {
         let mut request = plist::Dictionary::new();
         request.insert("Label".into(), "sideport".into());
         request.insert("Request".into(), "GetValue".into());
@@ -39,8 +54,8 @@ impl Lockdown {
         self.send(&request).await?;
         let payload = self.recv().await?;
 
-        println!("{}", String::from_utf8_lossy(&payload));
+        let response: GetValueResponse = plist::from_bytes(&payload)?;
 
-        Ok(())
+        Ok(response.value)
     }
 }
