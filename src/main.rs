@@ -5,6 +5,8 @@ use anyhow::{Context, Result};
 mod device;
 mod ipa;
 mod lockdown;
+mod tls;
+mod usbmux;
 
 #[tokio::main()]
 async fn main() -> Result<()> {

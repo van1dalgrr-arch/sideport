@@ -10,4 +10,5 @@ anyhow = "1.0.104"
 plist = "1.10.3"
 serde = { version = "1.0.229", features = ["derive"] }
 tokio = { version = "1.54.1", features = ["full"] }
+tokio-rustls = { version = "0.26.6", default-features = false, features = ["ring", "tls12"] }
 zip = "9.5.1"
