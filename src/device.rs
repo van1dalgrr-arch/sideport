@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use serde::Deserialize;
 
 use crate::lockdown::Lockdown;
 use crate::service::Service;
@@ -7,20 +8,64 @@ use crate::usbmux::{Device, Usbmux};
 
 const LOCKDOWN_PORT: u16 = 62078;
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct BrowseResponse {
+    status: String,
+    #[serde(default)]
+    current_list: Vec<App>,
+}
+
+#[derive(Debug, Deserialize)]
+struct App {
+    #[serde(rename = "CFBundleIdentifier")]
+    bundle_id: String,
+    #[serde(rename = "CFBundleDisplayName")]
+    name: Option<String>,
+    #[serde(rename = "CFBundleShortVersionString")]
+    version: Option<String>,
+}
+
 pub async fn apps() -> Result<()> {
     let mut mux = Usbmux::connect().await?;
     let devices = mux.devices().await?;
     let device = devices.first().context("no device found")?;
 
-    let mut session = open_session(device).await?;
-    let info = session
-        .start_service("com.apple.mobile.installation_proxy")
-        .await?;
+    let mut service = open_service(device, "com.apple.mobile.installation_proxy").await?;
 
-    println!(
-        "installation_proxy is on port {}, ssl {}",
-        info.port, info.enable_service_ssl
-    );
+    let attributes: Vec<plist::Value> = vec![
+        "CFBundleIdentifier".into(),
+        "CFBundleDisplayName".into(),
+        "CFBundleShortVersionString".into(),
+    ];
+
+    let mut options = plist::Dictionary::new();
+    options.insert("ApplicationType".into(), "User".into());
+    options.insert("ReturnAttributes".into(), plist::Value::Array(attributes));
+
+    let mut request = plist::Dictionary::new();
+    request.insert("Command".into(), "Browse".into());
+    request.insert("ClientOptions".into(), plist::Value::Dictionary(options));
+
+    service.send(&request).await?;
+
+    loop {
+        let payload = service.recv().await?;
+        let response: BrowseResponse = plist::from_bytes(&payload)?;
+
+        for app in &response.current_list {
+            println!(
+                "{} {} ({})",
+                app.name.as_deref().unwrap_or("?"),
+                app.version.as_deref().unwrap_or("?"),
+                app.bundle_id
+            );
+        }
+
+        if response.status == "Complete" {
+            break;
+        }
+    }
 
     Ok(())
 }
