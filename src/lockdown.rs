@@ -1,5 +1,5 @@
-use crate::usbmux::PairRecord;
 use crate::tls::{self, Stream};
+use crate::usbmux::PairRecord;
 use anyhow::{Context, Result};
 use serde::Deserialize;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -28,11 +28,33 @@ struct GetValueResponse {
     value: DeviceInfo,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct StartServiceResponse {
+    pub port: u16,
+    #[serde(rename = "EnableServiceSSL", default)]
+    pub enable_service_ssl: bool,
+}
+
 pub struct Lockdown {
     stream: Box<dyn Stream>,
 }
 
 impl Lockdown {
+    pub async fn start_service(&mut self, name: &str) -> Result<StartServiceResponse> {
+        let mut request = plist::Dictionary::new();
+        request.insert("Label".into(), "sideport".into());
+        request.insert("Request".into(), "StartService".into());
+        request.insert("Service".into(), name.into());
+
+        self.send(&request).await?;
+        let payload = self.recv().await?;
+
+        let response: StartServiceResponse =
+            plist::from_bytes(&payload).context("device refused to start the service")?;
+
+        Ok(response)
+    }
     pub async fn start_session(mut self, record: &PairRecord) -> Result<Self> {
         let mut request = plist::Dictionary::new();
         request.insert("Label".into(), "sideport".into());

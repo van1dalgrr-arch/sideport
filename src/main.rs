@@ -5,6 +5,7 @@ use anyhow::{Context, Result};
 mod device;
 mod ipa;
 mod lockdown;
+mod service;
 mod tls;
 mod usbmux;
 
@@ -18,6 +19,7 @@ async fn main() -> Result<()> {
             let path = args.next().context("usage: sideport info <file.ipa>")?;
             ipa::read_info(&path)?;
         }
+        "apps" => device::apps().await?,
         "devices" => device::list().await?,
         _ => anyhow::bail!("unknown command: {cmd}"),
     }
