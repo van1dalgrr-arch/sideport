@@ -7,7 +7,10 @@ description = "Open-source IPA sideloader for iPhone, written in Rust"
 
 [dependencies]
 anyhow = "1.0.104"
+isideload = "0.5.2"
 plist = "1.10.3"
+rootcause = { version = "0.12.1", features = ["compat-anyhow1"] }
+rpassword = "7.5.5"
 serde = { version = "1.0.229", features = ["derive"] }
 tokio = { version = "1.54.1", features = ["full"] }
 tokio-rustls = { version = "0.26.6", default-features = false, features = ["ring", "tls12"] }

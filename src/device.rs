@@ -116,7 +116,6 @@ pub async fn list() -> Result<()> {
     if devices.is_empty() {
         println!("no device found");
     }
-
     for d in &devices {
         println!(
             "{} ({}), id {}",
