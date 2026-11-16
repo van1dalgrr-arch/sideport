@@ -87,6 +87,24 @@ impl Usbmux {
         Ok(payload)
     }
 
+    pub async fn listen(&mut self) -> Result<()> {
+        let request = new_request("Listen");
+
+        self.send(&request).await?;
+        let payload = self.recv().await?;
+
+        let response: ResultResponse = plist::from_bytes(&payload)?;
+        if response.number != 0 {
+            bail!("usbmuxd refused to listen, code {}", response.number);
+        }
+
+        Ok(())
+    }
+
+    pub async fn next_message(&mut self) -> Result<Vec<u8>> {
+        self.recv().await
+    }
+
     pub async fn devices(&mut self) -> Result<Vec<Device>> {
         let request = new_request("ListDevices");
 

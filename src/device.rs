@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use serde::Deserialize;
 
+use crate::afc::Afc;
 use crate::lockdown::Lockdown;
 use crate::service::Service;
 use crate::tls::{self, Stream};
@@ -27,11 +28,9 @@ struct App {
 }
 
 pub async fn apps() -> Result<()> {
-    let mut mux = Usbmux::connect().await?;
-    let devices = mux.devices().await?;
-    let device = devices.first().context("no device found")?;
+    let device = first_device().await?;
 
-    let mut service = open_service(device, "com.apple.mobile.installation_proxy").await?;
+    let mut service = open_service(&device, "com.apple.mobile.installation_proxy").await?;
 
     let attributes: Vec<plist::Value> = vec![
         "CFBundleIdentifier".into(),
@@ -88,7 +87,7 @@ pub async fn open_session(device: &Device) -> Result<Lockdown> {
     lockdown.start_session(&record).await
 }
 
-pub async fn open_service(device: &Device, name: &str) -> Result<Service> {
+pub async fn open_stream(device: &Device, name: &str) -> Result<Box<dyn Stream>> {
     let mut mux = Usbmux::connect().await?;
     let record = mux
         .read_pair_record(&device.properties.serial_number)
@@ -106,7 +105,84 @@ pub async fn open_service(device: &Device, name: &str) -> Result<Service> {
         stream = tls::connect(stream, &record).await?;
     }
 
-    Ok(Service::new(stream))
+    Ok(stream)
+}
+
+pub async fn open_service(device: &Device, name: &str) -> Result<Service> {
+    Ok(Service::new(open_stream(device, name).await?))
+}
+
+async fn first_device() -> Result<Device> {
+    let mut mux = Usbmux::connect().await?;
+    let devices = mux.devices().await?;
+
+    let usb = devices
+        .iter()
+        .position(|d| d.properties.connection_type == "USB")
+        .unwrap_or(0);
+
+    devices
+        .into_iter()
+        .nth(usb)
+        .context("no device found")
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct InstallResponse {
+    status: Option<String>,
+    percent_complete: Option<u64>,
+    error: Option<String>,
+    error_description: Option<String>,
+}
+
+pub async fn install(path: &str) -> Result<()> {
+    let device = first_device().await?;
+
+    let name = std::path::Path::new(path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .context("bad ipa path")?;
+    let remote = format!("PublicStaging/{name}");
+
+    let mut afc = Afc::new(open_stream(&device, "com.apple.afc").await?);
+    afc.make_dir("PublicStaging").await?;
+    afc.upload(path, &remote).await?;
+
+    let mut service = open_service(&device, "com.apple.mobile.installation_proxy").await?;
+
+    let mut request = plist::Dictionary::new();
+    request.insert("Command".into(), "Install".into());
+    request.insert("PackagePath".into(), remote.into());
+    request.insert(
+        "ClientOptions".into(),
+        plist::Value::Dictionary(plist::Dictionary::new()),
+    );
+
+    service.send(&request).await?;
+
+    loop {
+        let payload = service.recv().await?;
+        let response: InstallResponse = plist::from_bytes(&payload)?;
+
+        if let Some(error) = response.error {
+            anyhow::bail!(
+                "install failed: {error}: {}",
+                response.error_description.unwrap_or_default()
+            );
+        }
+
+        let status = response.status.unwrap_or_default();
+        if status == "Complete" {
+            break;
+        }
+
+        println!("{}% {status}", response.percent_complete.unwrap_or(0));
+    }
+
+    println!("installed");
+
+    Ok(())
 }
 
 pub async fn list() -> Result<()> {
