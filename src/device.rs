@@ -121,10 +121,7 @@ async fn first_device() -> Result<Device> {
         .position(|d| d.properties.connection_type == "USB")
         .unwrap_or(0);
 
-    devices
-        .into_iter()
-        .nth(usb)
-        .context("no device found")
+    devices.into_iter().nth(usb).context("no device found")
 }
 
 #[derive(Debug, Deserialize)]
@@ -138,6 +135,13 @@ struct InstallResponse {
 
 pub async fn install(path: &str) -> Result<()> {
     let device = first_device().await?;
+
+    let mut lockdown = open_lockdown(&device).await?;
+    let info = lockdown.get_values().await?;
+
+    let signed =
+        crate::sign::sign_ipa(path, &info.device_name, &device.properties.serial_number).await?;
+    let path = signed.to_str().context("bad signed ipa path")?;
 
     let name = std::path::Path::new(path)
         .file_name()
