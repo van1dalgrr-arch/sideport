@@ -19,6 +19,7 @@ impl Service {
         let len = body.len() as u32;
         self.stream.write_all(&len.to_be_bytes()).await?;
         self.stream.write_all(&body).await?;
+        self.stream.flush().await?;
 
         Ok(())
     }

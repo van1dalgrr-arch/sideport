@@ -33,4 +33,5 @@ async fn main() -> Result<()> {
         _ => anyhow::bail!("unknown command: {cmd}"),
     }
     Ok(())
+
 }

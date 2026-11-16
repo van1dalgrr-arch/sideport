@@ -85,6 +85,7 @@ impl Afc {
         self.stream.write_all(&header.to_bytes()).await?;
         self.stream.write_all(args).await?;
         self.stream.write_all(data).await?;
+        self.stream.flush().await?;
 
         Ok(())
     }
