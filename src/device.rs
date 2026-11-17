@@ -69,6 +69,32 @@ pub async fn apps() -> Result<()> {
     Ok(())
 }
 
+pub async fn uninstall(bundle_id: &str) -> Result<()> {
+    let device = first_device().await?;
+    let mut service = open_service(&device, "com.apple.mobile.installation_proxy").await?;
+
+    let mut request = plist::Dictionary::new();
+    request.insert("Command".into(), "Uninstall".into());
+    request.insert("ApplicationIdentifier".into(), bundle_id.into());
+    service.send(&request).await?;
+
+    loop {
+        let payload = service.recv().await?;
+        let response: InstallResponse = plist::from_bytes(&payload)?;
+
+        if let Some(error) = response.error {
+            anyhow::bail!("uninstall failed: {error}");
+        }
+
+        if response.status.as_deref() == Some("Complete") {
+            break;
+        }
+    }
+    println!("removed {bundle_id}");
+
+    Ok(())
+}
+
 pub async fn open_lockdown(device: &Device) -> Result<Lockdown> {
     let mux = Usbmux::connect().await?;
     let stream = mux.connect_port(device.device_id, LOCKDOWN_PORT).await?;
