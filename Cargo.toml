@@ -3,6 +3,10 @@ name = "sideport"
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
+repository = "https://github.com/van1dalgrr-arch/sideport"
+readme = "README.md"
+keywords = ["ios", "iphone", "sideload", "ipa", "usbmuxd"]
+categories = ["command-line-utilities"]
 description = "Open-source IPA sideloader for iPhone, written in Rust"
 
 [dependencies]
