@@ -26,11 +26,8 @@ struct App {
     #[serde(rename = "CFBundleShortVersionString")]
     version: Option<String>,
 }
-
-pub async fn apps() -> Result<()> {
-    let device = first_device().await?;
-
-    let mut service = open_service(&device, "com.apple.mobile.installation_proxy").await?;
+async fn list_apps(device: &Device) -> Result<Vec<App>> {
+    let mut service = open_service(device, "com.apple.mobile.installation_proxy").await?;
 
     let attributes: Vec<plist::Value> = vec![
         "CFBundleIdentifier".into(),
@@ -48,22 +45,32 @@ pub async fn apps() -> Result<()> {
 
     service.send(&request).await?;
 
+    let mut apps = Vec::new();
+
     loop {
         let payload = service.recv().await?;
         let response: BrowseResponse = plist::from_bytes(&payload)?;
 
-        for app in &response.current_list {
-            println!(
-                "{} {} ({})",
-                app.name.as_deref().unwrap_or("?"),
-                app.version.as_deref().unwrap_or("?"),
-                app.bundle_id
-            );
-        }
+        apps.extend(response.current_list);
 
         if response.status == "Complete" {
             break;
         }
+    }
+
+    Ok(apps)
+}
+
+pub async fn apps() -> Result<()> {
+    let device = first_device().await?;
+
+    for app in list_apps(&device).await? {
+        println!(
+            "{} {} ({})",
+            app.name.as_deref().unwrap_or("?"),
+            app.version.as_deref().unwrap_or("?"),
+            app.bundle_id
+        );
     }
 
     Ok(())
@@ -71,6 +78,12 @@ pub async fn apps() -> Result<()> {
 
 pub async fn uninstall(bundle_id: &str) -> Result<()> {
     let device = first_device().await?;
+
+    let installed = list_apps(&device).await?;
+    if !installed.iter().any(|app| app.bundle_id == bundle_id) {
+        anyhow::bail!("{bundle_id} is not installed");
+    }
+
     let mut service = open_service(&device, "com.apple.mobile.installation_proxy").await?;
 
     let mut request = plist::Dictionary::new();
