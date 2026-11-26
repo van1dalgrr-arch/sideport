@@ -17,7 +17,9 @@ async fn main() -> Result<()> {
     let _ = tokio_rustls::rustls::crypto::ring::default_provider().install_default();
 
     let mut args = env::args().skip(1);
-    let cmd = args.next().context("usage: sideport <info|devices|apps|install|uninstall|login>")?;
+    let cmd = args
+        .next()
+        .context("usage: sideport <info|devices|apps|install|uninstall|login>")?;
 
     match cmd.as_str() {
         "info" => {
@@ -41,5 +43,4 @@ async fn main() -> Result<()> {
         _ => anyhow::bail!("unknown command: {cmd}"),
     }
     Ok(())
-
 }
