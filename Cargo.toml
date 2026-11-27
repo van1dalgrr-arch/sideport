@@ -11,7 +11,7 @@ description = "Open-source IPA sideloader for iPhone, written in Rust"
 
 [dependencies]
 anyhow = "1.0.104"
-isideload = "0.5.2"
+isideload = { version = "0.5.2", features = ["keyring-storage"] }
 plist = "1.10.3"
 rootcause = { version = "0.12.1", features = ["compat-anyhow1"] }
 rpassword = "7.5.5"

@@ -172,27 +172,18 @@ struct InstallResponse {
     error_description: Option<String>,
 }
 
-pub async fn install(path: &str) -> Result<()> {
-    let device = first_device().await?;
-
-    let mut lockdown = open_lockdown(&device).await?;
-    let info = lockdown.get_values().await?;
-
-    let signed =
-        crate::sign::sign_ipa(path, &info.device_name, &device.properties.serial_number).await?;
-    let path = signed.to_str().context("bad signed ipa path")?;
-
+async fn install_signed(device: &Device, path: &str) -> Result<()> {
     let name = std::path::Path::new(path)
         .file_name()
         .and_then(|n| n.to_str())
         .context("bad ipa path")?;
     let remote = format!("PublicStaging/{name}");
 
-    let mut afc = Afc::new(open_stream(&device, "com.apple.afc").await?);
+    let mut afc = Afc::new(open_stream(device, "com.apple.afc").await?);
     afc.make_dir("PublicStaging").await?;
     afc.upload(path, &remote).await?;
 
-    let mut service = open_service(&device, "com.apple.mobile.installation_proxy").await?;
+    let mut service = open_service(device, "com.apple.mobile.installation_proxy").await?;
 
     let mut request = plist::Dictionary::new();
     request.insert("Command".into(), "Install".into());
@@ -226,6 +217,36 @@ pub async fn install(path: &str) -> Result<()> {
     println!("installed");
 
     Ok(())
+}
+
+pub async fn install(path: &str) -> Result<()> {
+    let device = first_device().await?;
+
+    let mut lockdown = open_lockdown(&device).await?;
+    let info = lockdown.get_values().await?;
+
+    let signed =
+        crate::sign::sign_ipa(path, &info.device_name, &device.properties.serial_number).await?;
+    let path = signed.to_str().context("bad signed ipa path")?;
+
+    install_signed(&device, path).await
+}
+
+pub async fn refresh(path: &str) -> Result<()> {
+    let device = first_device().await?;
+
+    let mut lockdown = open_lockdown(&device).await?;
+    let info = lockdown.get_values().await?;
+
+    let signed =
+        crate::sign::sign_ipa(path, &info.device_name, &device.properties.serial_number).await?;
+    let path = signed.to_str().context("bad signed ipa path")?;
+
+    let bundle_id = crate::ipa::bundle_id(path).context("cannot read bundle id from ipa")?;
+
+    let _ = uninstall(&bundle_id).await;
+
+    install_signed(&device, path).await
 }
 
 pub async fn list() -> Result<()> {

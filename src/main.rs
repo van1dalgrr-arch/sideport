@@ -21,6 +21,16 @@ async fn main() -> Result<()> {
         .next()
         .context("usage: sideport <info|devices|apps|install|uninstall|login>")?;
 
+    if cmd == "help" || cmd == "--help" || cmd == "-h" {
+        println!("usage: sideport <info|devices|apps|install|uninstall|login|watch>");
+        return Ok(());
+    }
+
+    if cmd == "version" || cmd == "--version" || cmd == "-v" {
+        println!("sideport {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
+
     match cmd.as_str() {
         "info" => {
             let path = args.next().context("usage: sideport info <file.ipa>")?;
@@ -40,7 +50,12 @@ async fn main() -> Result<()> {
         }
         "apps" => device::apps().await?,
         "devices" => device::list().await?,
-        _ => anyhow::bail!("unknown command: {cmd}"),
+
+        "refresh" => {
+            let path = args.next().context("usage: sideport refresh <file.ipa>")?;
+            device::refresh(&path).await?;
+        }
+        _ => anyhow::bail!("unknown command: {cmd}. Run `sideport --help`."),
     }
     Ok(())
 }

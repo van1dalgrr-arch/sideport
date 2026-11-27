@@ -7,6 +7,7 @@ use tokio::net::UnixStream;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
+#[allow(dead_code)]
 struct StartSessionResponse {
     #[serde(rename = "SessionID")]
     session_id: String,

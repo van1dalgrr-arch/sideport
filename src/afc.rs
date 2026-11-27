@@ -181,7 +181,13 @@ impl Afc {
             self.expect_ok("write").await?;
 
             sent += n as u64;
-            let percent = if total == 0 { 100 } else { sent * 100 / total };
+            let percent = if total == 0 {
+                100
+            } else {
+                sent.checked_mul(100)
+                    .and_then(|v| v.checked_div(total))
+                    .unwrap_or(0)
+            };
             if percent != last_percent {
                 eprint!("\ruploading {percent}%");
                 last_percent = percent;

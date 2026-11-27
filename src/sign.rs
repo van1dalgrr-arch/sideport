@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result, bail};
 use isideload::dev::developer_session::{DeveloperSession, DevicesApi};
 use isideload::sideload::SideloaderBuilder;
+use isideload::sideload::builder::MaxCertsBehavior;
 use isideload::sideload::sideloader::Sideloader;
 use isideload::util::callbacks::{ExtensionsBehaviorCallbackBox, MaxCertsCallbackBox};
 use zip::write::SimpleFileOptions;
@@ -67,6 +68,7 @@ pub async fn sign_ipa(ipa: &str, device_name: &str, udid: &str) -> Result<PathBu
     let mut sideloader: Sideloader<MaxCertsCallbackBox, ExtensionsBehaviorCallbackBox> =
         SideloaderBuilder::new(session, apple_id)
             .machine_name("sideport".to_string())
+            .max_certs_behavior(MaxCertsBehavior::Revoke)
             .build();
 
     let team = sideloader.get_team().await?;
