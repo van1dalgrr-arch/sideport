@@ -4,9 +4,10 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
+use isideload::dev::certificates::DevelopmentCertificate;
 use isideload::dev::developer_session::{DeveloperSession, DevicesApi};
-use isideload::sideload::SideloaderBuilder;
 use isideload::sideload::builder::MaxCertsBehavior;
+use isideload::sideload::SideloaderBuilder;
 use isideload::sideload::sideloader::Sideloader;
 use isideload::util::callbacks::{ExtensionsBehaviorCallbackBox, MaxCertsCallbackBox};
 use zip::write::SimpleFileOptions;
@@ -31,6 +32,24 @@ fn ask(prompt: &str) -> Result<String> {
     io::stdin().read_line(&mut line)?;
 
     Ok(line.trim().to_string())
+}
+
+fn max_certs_prompt() -> MaxCertsCallbackBox {
+    Box::new(|certs: Vec<DevelopmentCertificate>| {
+        Box::pin(async move {
+            if let Some(cert) = certs.into_iter().next() {
+                if let Some(serial) = cert.serial_number {
+                    println!(
+                        "Revoking old certificate {} ({}) to free a signing slot",
+                        cert.name.as_deref().unwrap_or("?"),
+                        serial
+                    );
+                    return Ok(Some(vec![serial]));
+                }
+            }
+            Ok(None)
+        })
+    })
 }
 
 async fn sign_in() -> Result<(AppleAccount, String)> {
@@ -68,7 +87,7 @@ pub async fn sign_ipa(ipa: &str, device_name: &str, udid: &str) -> Result<PathBu
     let mut sideloader: Sideloader<MaxCertsCallbackBox, ExtensionsBehaviorCallbackBox> =
         SideloaderBuilder::new(session, apple_id)
             .machine_name("sideport".to_string())
-            .max_certs_behavior(MaxCertsBehavior::Revoke)
+            .max_certs_behavior(MaxCertsBehavior::Prompt(max_certs_prompt()))
             .build();
 
     let team = sideloader.get_team().await?;
