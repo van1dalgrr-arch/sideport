@@ -2,42 +2,61 @@
 
 [English](README.md) | **Русский**
 
+[![CI](https://github.com/van1dalgrr-arch/sideport/actions/workflows/ci.yml/badge.svg)](https://github.com/van1dalgrr-arch/sideport/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Rust](https://img.shields.io/badge/rust-2024-orange.svg)
-![Platform](https://img.shields.io/badge/platform-macOS-lightgrey.svg)
+[![Rust](https://img.shields.io/badge/rust-2024-orange.svg)](https://www.rust-lang.org)
+[![Platform](https://img.shields.io/badge/platform-macOS-lightgrey.svg)](https://apple.com/macos)
 
 Открытый сайдлоадер IPA для iPhone, написанный на Rust.
 
 Устанавливает IPA на твой iPhone с бесплатным Apple ID прямо из терминала и переподписывает приложение до того, как истечёт 7-дневная подпись. Бесплатная и открытая замена Sideloadly и AltStore.
 
-> **Статус: в разработке.** Работа с телефоном проверена на настоящем iPhone: sideport заливает IPA и запускает установку. Вход в Apple ID и подпись написаны, но ещё не проверены от начала до конца, поэтому приложения пока не устанавливаются. План ниже.
+## Возможности
+
+- **Установка** подписанных `.ipa` на подключённый iPhone по USB или Wi‑Fi
+- **Обновление приложения** (`refresh`): удаляет старую версию и ставит новую одной командой
+- **Список приложений** с названием, версией и идентификатором пакета
+- **Удаление** приложений по идентификатору пакета
+- **Управление устройствами:** список подключённых iPhone с моделью и версией iOS
+- **Наблюдение** за событиями подключения и отключения iPhone в реальном времени
+- **Информация об IPA:** чтение `CFBundleIdentifier` из любого `.ipa`
+- **Вход в Apple ID** с поддержкой двухфакторной аутентификации
+- **Проверка сертификата:** TLS с телефона верифицируется по pairing record
+- **Без библиотек Apple и без libimobiledevice** — чистая реализация протоколов usbmuxd, lockdownd, AFC и installation_proxy на Rust
 
 ## Команды
 
-| Команда | Что делает |
-|---|---|
-| `sideport devices` | Показывает подключённые iPhone (USB и Wi‑Fi): имя, модель, версию iOS |
-| `sideport apps` | Показывает пользовательские приложения на телефоне |
-| `sideport install <file.ipa>` | Подписывает IPA твоим Apple ID, заливает и устанавливает |
-| `sideport uninstall <bundle id>` | Удаляет приложение с телефона |
-| `sideport watch` | Печатает события подключения и отключения iPhone |
-| `sideport login` | Входит в Apple ID и печатает имя аккаунта |
-| `sideport info <file.ipa>` | Печатает bundle id из IPA |
+| Команда | Описание |
+|---------|----------|
+| `sideport devices` | Список подключённых iPhone (USB и Wi‑Fi) |
+| `sideport apps` | Список установленных пользовательских приложений |
+| `sideport install <file.ipa>` | Подписать и установить IPA |
+| `sideport refresh <file.ipa>` | Заменить установленное приложение новым IPA |
+| `sideport uninstall <bundle id>` | Удалить приложение с телефона |
+| `sideport login` | Войти в Apple ID |
+| `sideport info <file.ipa>` | Вывести bundle id из IPA |
+| `sideport watch` | Вывести события подключения/отключения устройств |
+| `sideport --version` | Вывести версию |
+| `sideport --help` | Показать справку |
+
+## Быстрый старт
 
 ```console
+$ git clone https://github.com/van1dalgrr-arch/sideport
+$ cd sideport
+$ cargo install --path .
 $ sideport devices
 00008120-000A1B2C3D4E5F6A (USB), id 3
   My iPhone, iPhone15,4, iOS 26.2.1
   secure session ok, My iPhone
 
-$ sideport apps
-Telegram 12.1 (ph.telegra.Telegraph)
-UTM SE 5.0.9 (com.utmapp.UTM-SE)
-
-$ sideport install UTM-SE.ipa
+$ sideport login
 Apple ID: you@example.com
 Password:
 2FA code: ******
+logged in as Example User
+
+$ sideport install UTM-SE.ipa
 signing...
 packing...
 uploading 100%
@@ -46,23 +65,23 @@ uploading 100%
 installed
 ```
 
-Если подключён кабель, sideport работает через него. Wi‑Fi используется, только когда кабеля нет.
+Если `sideport devices` ничего не показывает, подключи iPhone кабелем, разблокируй его и нажми «Доверять» на экране телефона.
 
 ## Как это устроено
 
-Часть, которая общается с телефоном, написана с нуля, без библиотек Apple и без libimobiledevice:
+sideport общается с `usbmuxd` через Unix-сокет, без библиотек Apple и без `libimobiledevice`:
 
 ```
 sideport ─ Unix-сокет ─▶ usbmuxd ─ USB / Wi‑Fi ─▶ iPhone
-                                                   ├─ lockdownd           (порт 62078)
-                                                   ├─ AFC                 (заливка файлов)
-                                                   └─ installation_proxy  (установка, список, удаление)
+                                                    ├─ lockdownd           (порт 62078)
+                                                    ├─ AFC                 (заливка файлов)
+                                                    └─ installation_proxy  (установка, список, удаление)
 ```
 
-1. **usbmuxd.** sideport общается с демоном `usbmuxd` через `/var/run/usbmuxd`: получает список устройств, читает pairing record, который Mac создал, когда ты нажал «Доверять», и открывает туннели к портам телефона.
+1. **usbmuxd.** sideport соединяется с `/var/run/usbmuxd`, получает список устройств, читает pairing record, который Mac создал при нажатии «Доверять», и открывает туннели к портам телефона.
 2. **lockdownd.** Через туннель к порту 62078 начинает сессию с сертификатом из pairing record и переводит соединение в TLS.
-3. **Сервисы.** Просит `lockdownd` запустить сервис, получает порт и открывает к нему второй TLS-туннель.
-4. **AFC.** IPA заливается на телефон по Apple File Conduit: небольшой бинарный протокол с 40-байтными заголовками пакетов.
+3. **Сервисы.** Просит `lockdownd` запустить сервис, получает порт и открывает второй TLS-туннель к нему.
+4. **AFC.** IPA заливается на телефон по Apple File Conduit — бинарному протоколу с 40-байтными заголовками пакетов.
 5. **installation_proxy.** Телефон распаковывает, проверяет и устанавливает залитый IPA и сообщает прогресс.
 
 Подпись сделана на крейте [isideload](https://crates.io/crates/isideload): вход в Apple ID с двухфакторной аутентификацией, бесплатный сертификат разработчика, App ID, provisioning-профили и подпись кода.
@@ -90,6 +109,22 @@ sideport devices
 
 Если `sideport devices` ничего не показывает, подключи телефон кабелем, разблокируй его и нажми «Доверять».
 
+### Из исходников
+
+```sh
+cargo build --release
+./target/release/sideport devices
+```
+
+### Разработка
+
+```sh
+cargo fmt          # форматирование кода
+cargo clippy       # линтинг кода
+cargo test         # запуск тестов
+cargo build --release
+```
+
 ## План
 
 - [x] Чтение IPA и разбор `Info.plist`
@@ -99,6 +134,7 @@ sideport devices
 - [x] Список и удаление установленных приложений
 - [x] Заливка IPA по AFC и установка через `installation_proxy`
 - [x] События подключения и отключения телефона
+- [x] Обновление: удаление старой версии, установка новой
 - [ ] Вход в Apple ID и подпись, проверенные от начала до конца
 - [ ] Хранение сессии Apple ID в Keychain
 - [ ] `refresh`: переподпись установленных приложений до истечения 7 дней
